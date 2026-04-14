@@ -1,0 +1,6 @@
+label,net_pnl,sharpe,max_dd_pct,profit_factor,filled,tp_count,settled,csv_path,elapsed_sec
+Baseline (6min),5422.26,0.4171,30.29,1.14,2241,959,1383,charts/btc_main/full_validation/r2_Baseline_6min.csv,169.4
+R1: Cancel=4m,13309.74,1.1607,12.47,1.5,1146,636,550,charts/btc_main/full_validation/r2_R1_Cancel4m.csv,149.7
+R2: C4m+TP=0.4+SkipWknd,20283.18,1.5465,12.12,1.92,1146,579,586,charts/btc_main/full_validation/r2_R2_C4m_TP0.4_SkipWknd.csv,149.8
+R2: C4m+TP=0.4+Risk1%,18795.99,1.7886,11.08,1.83,1146,581,591,charts/btc_main/full_validation/r2_R2_C4m_TP0.4_Risk1%.csv,151.4
+R2: C4m+SkipLondon,12485.31,1.3194,11.83,1.56,933,527,442,charts/btc_main/full_validation/r2_R2_C4m_SkipLondon.csv,125.6

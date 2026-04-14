@@ -1,0 +1,4 @@
+#!/bin/bash
+# Wrapper: run NYCClimatologyFadeStrategy backtest from btc15m_backtest/
+cd "$(dirname "$0")"
+./btc15m_backtest/backtest_nyc_climate "$@"

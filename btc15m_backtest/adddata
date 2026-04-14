@@ -1,0 +1,38 @@
+#!/bin/bash
+# Add more data (refresh backtest) and refresh all graphs
+cd "$(dirname "$0")"
+PYTHON="../.venv/bin/python"
+
+echo "=== 1. Running backtest with fresh markets (7000 markets, refresh=1) ==="
+$PYTHON run_backtest.py KXBTC15M 7000 0.10 1000 1.0 1
+
+echo ""
+echo "=== 2. Running recent backtest (Mar 11+, \$300 bankroll) ==="
+$PYTHON run_backtest_recent.py
+
+echo ""
+echo "=== 3. Refreshing overlay analysis graph ==="
+$PYTHON overlay_analysis.py trades_KXBTC15M.csv --out-dir charts/btc_main \
+    --plot-path "charts/MISC Charts/overlay_analysis.png"
+
+echo ""
+echo "=== 4. Refreshing equity curves ==="
+$PYTHON plot_equity.py trades_KXBTC15M.csv \
+    --output charts/btc_main/trades_KXBTC15M_equity.png
+
+$PYTHON plot_equity.py --no-default-overlays \
+    -o overlay_btc.csv -o overlay_vix.csv -o overlay_etf.csv \
+    --overlay-label "BTC Price" --overlay-label "VIX" --overlay-label "ETF (IBIT)" \
+    --output charts/btc_main/Equity-Curve-Overlay-VIX-ETf-BTC.png
+
+$PYTHON plot_equity.py trades_KXBTC15M_recent.csv --no-default-overlays \
+    -o overlay_vix.csv --overlay-label "VIX" \
+    --bankroll 300 \
+    --output charts/btc_main/Equity-Curve-Recent-VIX.png
+
+echo ""
+echo "Done. Updated:"
+echo "  - charts/MISC Charts/overlay_analysis.png"
+echo "  - charts/btc_main/trades_KXBTC15M_equity.png"
+echo "  - charts/btc_main/Equity-Curve-Overlay-VIX-ETf-BTC.png"
+echo "  - charts/btc_main/Equity-Curve-Recent-VIX.png"

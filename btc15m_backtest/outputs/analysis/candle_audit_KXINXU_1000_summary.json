@@ -1,0 +1,11 @@
+{
+  "series": "KXINXU",
+  "markets_requested": 1000,
+  "viable_settled_with_valid_window": 1000,
+  "viable_with_at_least_one_candle": 1000,
+  "viable_with_zero_candles": 0,
+  "non_viable": 0,
+  "coverage_ratio_median": 0.05,
+  "tickers_viable_but_no_candles": [],
+  "note": "Viable = settled yes/no + open/close + duration>0. Zero candles on viable = ingestion gap worth investigating."
+}

@@ -1,0 +1,28 @@
+#!/bin/bash
+# Run AdaptiveLimitFadeStrategy backtest + equity curve (future_exploration/).
+# Usage:
+#   ./backtest_fade             # 7000 markets (full), $1000 bankroll
+#   ./backtest_fade 1000        # 1000 markets
+#   ./backtest_fade 7000 0.10 1000 0.005   # custom vol threshold (0.5%)
+cd "$(dirname "$0")"
+PYTHON="../.venv/bin/python"
+FE="future_exploration"
+
+MARKETS="${1:-7000}"
+
+echo "=== AdaptiveLimitFadeStrategy Backtest ==="
+echo ""
+$PYTHON "$FE/run_backtest_fade.py" "$@"
+
+echo ""
+echo "=== Generating equity curve ==="
+mkdir -p "$FE/charts/btc_fade"
+$PYTHON plot_equity.py "$FE/trades_KXBTC15M_fade.csv" --no-default-overlays \
+    -o overlay_vix.csv --overlay-label "VIX" \
+    --bankroll 1000 \
+    --output "$FE/charts/btc_fade/Equity-Curve-Fade-VIX.png"
+
+echo ""
+echo "Done. Updated:"
+echo "  - $FE/trades_KXBTC15M_fade.csv"
+echo "  - $FE/charts/btc_fade/Equity-Curve-Fade-VIX.png"

@@ -1,0 +1,51 @@
+STRATEGY ENVIRONMENT REPORT (filled markets only, P&L from exits)
+Markets in sample: 1290  |  Date range (open_day UTC): 2025-12-12 .. 2026-03-28
+
+=== Best / worst UTC hours (by mean P&L per market) ===
+ hour_utc  n  mean_pnl  sum_pnl  median_pnl      win
+       10 60 48.326667  2899.60       2.505 0.566667
+       12 56 39.698036  2223.09       1.325 0.571429
+        2 45 39.327111  1769.72       2.360 0.600000
+       23 68 39.173676  2663.81       0.095 0.500000
+       20 56 35.952143  2013.32      -9.250 0.375000
+       11 53 32.537547  1724.49      -2.300 0.415094
+...
+ hour_utc  n   mean_pnl  sum_pnl  median_pnl      win
+       22 58 -20.518448 -1190.07       -4.65 0.396552
+       16 57 -22.782456 -1298.60       -6.60 0.438596
+        0 43 -30.696279 -1319.94       -6.00 0.418605
+        5 47 -32.485532 -1526.82      -10.00 0.361702
+
+=== By weekday (UTC) ===
+ dow   n   mean_pnl  sum_pnl      win dow_name
+   0 176  32.803409  5773.40 0.494318      Mon
+   2 197  18.513350  3647.13 0.497462      Wed
+   6 216  14.635556  3161.28 0.500000      Sun
+   1 174  11.552759  2010.18 0.442529      Tue
+   3 163  10.365460  1689.57 0.447853      Thu
+   4 190  -0.122474   -23.27 0.505263      Fri
+   5 174 -27.598908 -4802.21 0.362069      Sat
+
+=== By same-day VIX tercile (among trade days only) ===
+vix_terc   n  mean_vix  mean_pnl  sum_pnl      win
+ low_vix 287 14.999338  2.630836   755.05 0.592334
+ mid_vix 286 17.484196 18.815559  5381.25 0.454545
+high_vix 287 23.184042 24.436481  7013.27 0.404181
+
+=== 'Prediction' checks (daily total PnL; UTC calendar days) ===
+A) Same-day macro (t) vs NEXT day PnL (t+1): coarse; equity close may lag some opens.
+B) Prior-day macro (t-1) vs SAME day PnL (t): no same-day lookahead.
+  corr: vix (day t) vs pnl day t+1: -0.197
+  corr: vix_chg (day t) vs pnl day t+1: +0.012
+  corr: hyg_ret (day t) vs pnl day t+1: +0.050
+  corr: btc_ret (day t) vs pnl day t+1: -0.118
+  corr: vix_lag1 vs pnl same day t: -0.197
+  corr: vix_chg_lag1 vs pnl same day t: +0.012
+  corr: hyg_ret_lag1 vs pnl same day t: +0.050
+  corr: btc_ret_lag1 vs pnl same day t: -0.118
+
+INTERPRETATION / CAVEATS
+- These are IN-SAMPLE patterns on one backtest; easy to overfit. Validate with walk-forward or new data.
+- Macro (VIX, HYG, BTC) is DAILY while your edge is 15m microstructure — weak linkage is expected.
+- Strong hours/days may reflect LIQUIDITY / participant mix, not 'VIX predicts Kalshi'.
+- Fill model + compounding size dominate P&L path; regime labels are only coarse filters.

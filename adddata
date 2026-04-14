@@ -1,0 +1,4 @@
+#!/bin/bash
+# Wrapper: refresh backtest data and charts from btc15m_backtest/
+cd "$(dirname "$0")"
+./btc15m_backtest/adddata "$@"

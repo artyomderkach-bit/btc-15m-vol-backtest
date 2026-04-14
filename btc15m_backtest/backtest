@@ -1,0 +1,35 @@
+#!/bin/bash
+# Run backtest. Usage:
+#   ./backtest           # 1000 markets, $1000 bankroll, 10% fill
+#   ./backtest 100       # 100 markets → only updates small equity curve (recent CSV)
+cd "$(dirname "$0")"
+PYTHON="../.venv/bin/python"
+
+MARKETS="${1:-1000}"
+
+# Small backtest (< 1000): write to _recent.csv only, skip main CSV. Big chart untouched.
+if [ "$MARKETS" -lt 1000 ]; then
+  echo "=== Small backtest ($MARKETS markets) → writes to trades_KXBTC15M_recent.csv only ==="
+  $PYTHON run_backtest.py KXBTC15M "$MARKETS" 0.10 1000 1.0 0 recent
+else
+  echo "=== 1. Main backtest ($MARKETS markets, \$1000 bankroll) ==="
+  $PYTHON run_backtest.py KXBTC15M "$MARKETS" 0.10 1000 1.0 0
+
+  echo ""
+  echo "=== 2. Recent backtest (Mar 11+, \$300 bankroll) ==="
+  $PYTHON run_backtest_recent.py
+fi
+
+echo ""
+echo "=== 3. Regenerating recent equity curve ==="
+$PYTHON plot_equity.py trades_KXBTC15M_recent.csv --no-default-overlays \
+    -o overlay_vix.csv --overlay-label "VIX" \
+    --bankroll 300 \
+    --output Equity-Curve-Recent-VIX.png
+
+echo ""
+echo "Done. Updated:"
+echo "  - Equity-Curve-Recent-VIX.png"
+echo ""
+echo "Note: Equity-Curve-Overlay-VIX-ETf-BTC.png is NOT auto-updated."
+echo "      Run ./adddata to refresh it with the latest data."

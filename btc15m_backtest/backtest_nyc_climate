@@ -1,0 +1,38 @@
+#!/bin/bash
+# Run NYCClimatologyFadeStrategy backtest + equity curve (future_exploration/).
+#
+# Usage:
+#   ./backtest_nyc_climate                          # defaults (KXHIGHNY, 500 markets)
+#   ./backtest_nyc_climate KXHIGHNY 1000            # 1000 markets
+#   ./backtest_nyc_climate KXHIGHNY 500 0.10 1000 2.0     # custom z_threshold=2.0
+#
+# Args: [SERIES] [MARKETS] [VOL_FILL_PCT] [BANKROLL] [Z_THRESHOLD] [TP_FILL_RATE] [REFRESH]
+cd "$(dirname "$0")"
+PYTHON="../.venv/bin/python"
+FE="future_exploration"
+export PYTHONDONTWRITEBYTECODE=1
+
+echo "=== NYCClimatologyFadeStrategy Backtest ==="
+echo ""
+$PYTHON "$FE/run_backtest_nyc_climate.py" "$@"
+
+SERIES="${1:-KXHIGHNY}"
+
+# Generate equity curve if trade log exists
+CSV="$FE/trades_${SERIES}_nyc_climate.csv"
+if [ -f "$CSV" ]; then
+    echo ""
+    echo "=== Generating equity curve ==="
+    mkdir -p "$FE/charts/nyc_climate"
+    $PYTHON plot_equity.py "$CSV" --no-default-overlays \
+        -o overlay_vix.csv --overlay-label "VIX" \
+        --bankroll "${4:-1000}" \
+        --output "$FE/charts/nyc_climate/Equity-Curve-NYC-Climate-VIX.png"
+    echo ""
+    echo "Done. Updated:"
+    echo "  - $CSV"
+    echo "  - $FE/charts/nyc_climate/Equity-Curve-NYC-Climate-VIX.png"
+else
+    echo ""
+    echo "No trade log generated — no equity curve to plot."
+fi

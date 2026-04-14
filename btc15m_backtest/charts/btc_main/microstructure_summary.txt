@@ -1,0 +1,72 @@
+MICROSTRUCTURE PREDICTOR REPORT
+Markets with features: 1290  |  Feature window: first 4 bars (~4 min)
+
+=== Feature → P&L correlations (sorted by |corr_pnl|) ===
+          feature    n  corr_pnl  corr_win     mean_val      std_val
+price_level_abs50 1290 -0.331471 -0.648116     0.312020     0.129829
+        vol_total 1290  0.232414 -0.001661 62858.449612 69518.006307
+        rvol_full 1285  0.191086  0.229621     0.438654     0.334251
+      range_early 1290  0.105609  0.367949     0.527543     0.149002
+          oi_bar4 1290 -0.081361 -0.204908 10661.703876 13087.731012
+       spread_min  206  0.038749 -0.092466     0.038689     0.062491
+        vol_early 1290 -0.034449 -0.184029 17673.244961 21151.543604
+   imbalance_bar4 1290  0.033395  0.018190    -0.467831    77.051421
+        rvol_4bar 1272 -0.021092 -0.033474     0.267170     0.271080
+   price_mid_bar4 1290  0.019262  0.018776     0.494733     0.338023
+         vol_bar1 1290  0.005245 -0.140175  3187.982171  4932.676499
+      spread_mean 1290 -0.001313  0.106746     0.032776     0.042026
+
+=== Quartile bucket analysis (top 6 features) ===
+
+--- price_level_abs50 ---
+quartile   n  mean_feat_val   mean_pnl  median_pnl  win_rate   sum_pnl
+  Q1_low 323       0.114009  80.583591       15.37  0.956656  26028.50
+      Q2 322       0.310264  31.583075        0.88  0.537267  10169.75
+      Q3 322       0.387280  -7.913851      -17.70  0.257764  -2548.26
+ Q4_high 323       0.436755 -68.711796      -44.40  0.114551 -22193.91
+
+--- vol_total ---
+quartile   n  mean_feat_val   mean_pnl  median_pnl  win_rate  sum_pnl
+  Q1_low 323    3831.975232  -0.778328       -0.40  0.458204  -251.40
+      Q2 322   16291.512422   0.088882        1.47  0.543478    28.62
+      Q3 322   64234.990683 -20.146491      -38.90  0.409938 -6487.17
+ Q4_high 323  166935.411765  56.241579      -76.90  0.455108 18166.03
+
+--- rvol_full ---
+quartile   n  mean_feat_val   mean_pnl  median_pnl  win_rate   sum_pnl
+  Q1_low 322       0.077318 -52.006988      -29.70  0.177019 -16746.25
+      Q2 321       0.251029  34.603240        2.66  0.638629  11107.64
+      Q3 321       0.535641  -4.016916       -7.70  0.417445  -1289.43
+ Q4_high 321       0.891755  57.277040        4.43  0.638629  18385.93
+
+--- range_early ---
+quartile   n  mean_feat_val  mean_pnl  median_pnl  win_rate  sum_pnl
+  Q1_low 323       0.367433 -2.190186       -4.20  0.312693  -707.43
+      Q2 322       0.464575 -9.602391      -18.10  0.319876 -3091.97
+      Q3 322       0.544606  3.008478       -4.16  0.475155   968.73
+ Q4_high 323       0.733418 44.231424        5.62  0.758514 14286.75
+
+--- oi_bar4 ---
+quartile   n  mean_feat_val  mean_pnl  median_pnl  win_rate  sum_pnl
+  Q1_low 323     577.269350  1.210124        0.29  0.535604   390.87
+      Q2 322    2403.226708  4.120963        1.47  0.540373  1326.95
+      Q3 322   10037.621118 35.791460      -15.40  0.484472 11524.85
+ Q4_high 323   29601.198142 -5.531238     -112.40  0.306502 -1786.59
+
+--- spread_min ---
+quartile  n  mean_feat_val   mean_pnl  median_pnl  win_rate  sum_pnl
+  Q1_low 52       0.000000   2.768846        0.29  0.615385   143.98
+      Q2 51       0.004902 -16.675686       -1.70  0.352941  -850.46
+      Q3 51       0.026471   0.257255        0.29  0.588235    13.12
+ Q4_high 52       0.122500   0.435769       -0.50  0.461538    22.66
+
+=== INTERPRETATION ===
+- These features are measured from the FIRST 4 minutes of each market,
+  which is BEFORE or concurrent with the entry fill window (6 min cutoff).
+- Strongest correlations point to microstructure conditions that your
+  10¢ buy / TP sell strategy benefits from.
+- Quartile splits show monotonicity: does P&L improve consistently
+  as the feature moves from Q1 to Q4, or is it nonlinear?
+- CAUTION: in-sample on one strategy backtest; validate out-of-sample.
+- Even modest r ~ 0.10-0.15 on microstructure features can be actionable
+  because they match the TIME SCALE of your edge (minutes, not days).

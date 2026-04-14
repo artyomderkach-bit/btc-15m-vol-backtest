@@ -1,0 +1,73 @@
+ROLLING WINDOW DEEP DIVE
+Markets (chronological by first event): 1290
+Window size: 200
+
+=== Timing filters on first buy_fill (unix ts vs API open_ts) ===
+Note: candles are 1-minute; fills use bar end_ts — 'first second' is rarely observable.
+Practical proxy: fill in first MINUTE after open = first_buy_ts <= open_ts + 60.
+Markets with known open_ts: 1290
+first_second (<= open+1s): 0 (0.0%)
+fill_first_minute (<= open+60s): 384 (29.8%)
+Exit PnL sum on first-minute fills: $18,681.32
+Exit PnL sum on OTHER markets: $-7,225.24
+Contrib sum (path $ bridge) first-minute: $18,460.95  |  other: $-8,255.79
+Last-200: first-minute markets = 39, their exit PnL = $4,149.52
+Last-200: exit PnL if those removed (sum rest) = $-7,660.14
+
+Note: 'contrib' is end_br−start_br on the realized path; first-minute markets can
+carry large positive $contrib while others sum negative (still totals +$10,205 to final).
+Zeroing contrib for a subset is NOT the same as 'fixing data errors' — it rewires compounding.
+
+=== Rolling WINDOW — bankroll-based return (compounding-aware) ===
+window_ret = (br_after_last_in_window - br_before_first) / br_before_first
+Last window: markets index [1090 .. 1289]
+  window_ret = -26.56%
+  sum_pnl_exit / br_before = -23.01% (approx additive)
+  mean pnl/market = $-17.55, win_rate = 29.5%
+  Rank of last window_ret (1=worst): 1 / 1091
+  z-score vs all rolling windows: -1.45
+
+=== Synthetic path: first-MINUTE markets get contrib=0 (illustrative only) ===
+Expect nonsense if those markets were net + on the path (here they are, full sample).
+Last window window_ret_adj = -949.02%
+Rank of last window (1=worst): 18 / 1091
+Final synthetic bankroll: $-7,255.79  |  actual: $11,205.16
+
+=== Last-200 window — calendar / session ===
+Open-day UTC range: 2026-03-07 00:00:00 .. 2026-03-28 00:00:00
+Hour UTC (market open) distribution (last 200):
+  00:00  n=12
+  01:00  n=5
+  02:00  n=10
+  03:00  n=10
+  04:00  n=8
+  05:00  n=8
+  06:00  n=6
+  07:00  n=14
+  08:00  n=10
+  09:00  n=15
+  10:00  n=4
+  11:00  n=9
+  12:00  n=10
+  13:00  n=16
+  14:00  n=10
+  15:00  n=9
+  16:00  n=4
+  17:00  n=4
+  18:00  n=6
+  19:00  n=3
+  20:00  n=5
+  21:00  n=5
+  22:00  n=13
+  23:00  n=4
+
+=== Macro on market OPEN days (UTC calendar day) ===
+ALL trade days: n_calendar_days=106  VIX_obs=72  HYG_obs=72
+  VIX close mean (on those days) = 19.31  (median 17.86)
+  HYG close mean (on those days) = 80.00
+  HYG mean daily pct chg over continuous span 2025-12-12..2026-03-28 = -0.0119%  (std 0.263%, trading days=71)
+LAST-200 window open days: n_calendar_days=22  VIX_obs=15  HYG_obs=15
+  VIX close mean (on those days) = 25.86  (median 25.50)
+  HYG close mean (on those days) = 79.44
+  HYG mean daily pct chg over continuous span 2026-03-07..2026-03-28 = -0.1292%  (std 0.475%, trading days=14)
+(Compare VIX/HYG lines across rows; last window is a subset of dates.)
