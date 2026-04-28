@@ -84,10 +84,39 @@ class StinkBidEngine:
                 return b
         return bars[-1] if bars else None
 
+    def _annotate_adverse_selection(self, market: str, bars) -> None:
+        if not bars:
+            return
+        fill_rows = [
+            r for r in self.strategy.trade_log
+            if r.get("market") == market and r.get("action") == "fill" and r.get("ts_fill") is not None
+        ]
+        for row in fill_rows:
+            ts_fill = float(row["ts_fill"])
+            side = row.get("side", "YES")
+            entry = float(row.get("entry_price") or 0.0)
+            bar_1m = self._bar_at_or_after_ts(bars, int(ts_fill + 60))
+            bar_5m = self._bar_at_or_after_ts(bars, int(ts_fill + 300))
+            mid_1m = mid_from_bar(bar_1m) if bar_1m is not None else None
+            mid_5m = mid_from_bar(bar_5m) if bar_5m is not None else None
+
+            def _adverse(mid):
+                if mid is None:
+                    return None
+                if side == "YES":
+                    return float(mid) - entry
+                return (1.0 - float(mid)) - entry
+
+            row["mid_1m"] = mid_1m
+            row["mid_5m"] = mid_5m
+            row["adverse_selection_1m"] = _adverse(mid_1m)
+            row["adverse_selection_5m"] = _adverse(mid_5m)
+
     def run(
         self,
         config: Optional[StinkBidConfig] = None,
         silent: bool = False,
+        progress_every: int = 200,
     ) -> Dict[str, Any]:
         if config is not None:
             self.config = config
@@ -97,8 +126,13 @@ class StinkBidEngine:
         mkts = sorted(mkts, key=lambda m: _to_unix_ts(m.get("close_time")) or 0)
         used_trade_data_count = 0
         missing_trade_data_count = 0
+        total_markets = len(mkts)
+        import time as _time
+        _t_start = _time.time()
+        if not silent and total_markets > 0:
+            print(f"Starting backtest over {total_markets} markets...", flush=True)
 
-        for m in mkts:
+        for _idx, m in enumerate(mkts, start=1):
             ticker = m.get("ticker", "")
             result = (m.get("result") or "").strip().lower()
             close_ts = _to_unix_ts(m.get("close_time"))
@@ -142,6 +176,7 @@ class StinkBidEngine:
                 trades=trades,
                 used_trade_data=used_trade_data,
             )
+            self._annotate_adverse_selection(ticker, bars)
 
             if self.config.exit_mode == "time_exit":
                 exit_ts = self._ts_for_time_exit(open_ts, self.config.time_exit_minutes)
@@ -180,6 +215,23 @@ class StinkBidEngine:
                     "used_trade_data": used_trade_data,
                 }
             )
+
+            if not silent and progress_every and (_idx % int(progress_every) == 0 or _idx == total_markets):
+                total_fills_so_far = sum(
+                    1 for r in self.strategy.trade_log if r.get("action") == "fill"
+                )
+                total_submits_so_far = sum(
+                    1 for r in self.strategy.trade_log if r.get("action") == "submit"
+                )
+                elapsed = max(1e-6, _time.time() - _t_start)
+                rate = _idx / elapsed
+                remaining = (total_markets - _idx) / rate if rate > 0 else 0.0
+                print(
+                    f"  [{_idx}/{total_markets}] submits={total_submits_so_far} "
+                    f"fills={total_fills_so_far} trade_data={used_trade_data_count}/{_idx} "
+                    f"elapsed={elapsed:.1f}s eta={remaining:.1f}s",
+                    flush=True,
+                )
 
         trade_df = pd.DataFrame(self.strategy.trade_log) if self.strategy.trade_log else pd.DataFrame()
         summary = self.strategy.summarize()

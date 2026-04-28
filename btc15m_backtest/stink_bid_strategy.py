@@ -8,6 +8,7 @@ Limitations:
 """
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import dataclass
 from statistics import median
@@ -98,6 +99,7 @@ class StinkBidStrategy:
 
     @staticmethod
     def _trade_ts(tr: dict) -> Optional[float]:
+        import datetime as _dt
         for k in ("created_time", "created_ts", "ts"):
             v = tr.get(k)
             if v is None:
@@ -105,6 +107,14 @@ class StinkBidStrategy:
             if isinstance(v, (int, float)):
                 iv = float(v)
                 return iv / 1000.0 if iv > 1_000_000_000_000 else iv
+            if isinstance(v, str):
+                s = v.strip()
+                if not s:
+                    continue
+                try:
+                    return float(s) if s.replace(".", "", 1).isdigit() else _dt.datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
+                except Exception:
+                    continue
         return None
 
     @staticmethod
@@ -248,10 +258,15 @@ class StinkBidStrategy:
             return yes_px <= order.price + 1e-12
         return yes_px >= (1.0 - order.price) - 1e-12
 
-    def process_trade_window(self, market: str, open_ts: int, close_ts: int, trades: Sequence[dict], used_trade_data: bool) -> None:
-        orders = self._open_orders.get(market, [])
-        if not orders:
-            return
+    def _simulate_fill_pass(
+        self,
+        market: str,
+        open_ts: int,
+        close_ts: int,
+        trades: Sequence[dict],
+        used_trade_data: bool,
+        orders: List[SimOrder],
+    ) -> None:
         for tr in trades:
             ts = self._trade_ts(tr)
             yes_px = self._trade_yes_price(tr)
@@ -355,6 +370,82 @@ class StinkBidStrategy:
                     "note": "timeout_cancel",
                 }
             )
+
+    def _replacement_orders(
+        self,
+        market: str,
+        canceled: List[SimOrder],
+        open_ts: int,
+        close_ts: int,
+    ) -> List[SimOrder]:
+        new_orders: List[SimOrder] = []
+        market_exposure = self._exposure_by_market.get(market, 0.0)
+        for src in canceled:
+            if market_exposure >= self.config.max_notional_per_market:
+                break
+            window = self.config.cancel_timeout_ms / 1000.0
+            submit_ts = float(src.ts_expire)
+            expire_ts = submit_ts + window
+            if expire_ts > float(close_ts):
+                continue
+            max_qty_exposure = int((self.config.max_notional_per_market - market_exposure) / max(src.price, 1e-9))
+            qty = max(0, min(self.config.max_contracts_per_level, max_qty_exposure))
+            if qty <= 0:
+                continue
+            o = self._make_order(market, src.side, src.level_idx, src.price, qty, submit_ts, expire_ts)
+            new_orders.append(o)
+            market_exposure += qty * src.price
+            self.trade_log.append(
+                {
+                    "market": market,
+                    "side": src.side,
+                    "action": "submit",
+                    "order_id": o.order_id,
+                    "level_idx": src.level_idx,
+                    "price": src.price,
+                    "qty": qty,
+                    "ts_submit": submit_ts,
+                    "ts_fill": None,
+                    "ts_cancel": None,
+                    "ts_exit": None,
+                    "entry_price": None,
+                    "exit_price": None,
+                    "pnl_gross": 0.0,
+                    "fees": 0.0,
+                    "pnl_net": 0.0,
+                    "bankroll": self.bankroll,
+                    "open_ts": open_ts,
+                    "close_ts": close_ts,
+                    "latency_ms_submit_from_open": (submit_ts - float(open_ts)) * 1000.0,
+                    "fill_latency_ms": None,
+                    "used_trade_data": None,
+                    "note": "replacement",
+                }
+            )
+        self._exposure_by_market[market] = market_exposure
+        self._max_exposure = max(self._max_exposure, market_exposure)
+        return new_orders
+
+    def process_trade_window(self, market: str, open_ts: int, close_ts: int, trades: Sequence[dict], used_trade_data: bool) -> None:
+        orders = self._open_orders.get(market, [])
+        if not orders:
+            return
+
+        active = list(orders)
+        max_cycles = max(2, int(self.config.num_levels) + 1) if self.config.replace_canceled else 1
+        cycles_done = 0
+        while active and cycles_done < max_cycles:
+            self._simulate_fill_pass(market, open_ts, close_ts, trades, used_trade_data, active)
+            cycles_done += 1
+            if not self.config.replace_canceled:
+                break
+            canceled_unfilled = [o for o in active if o.status == "cancelled" and o.qty_filled == 0]
+            if not canceled_unfilled:
+                break
+            active = self._replacement_orders(market, canceled_unfilled, open_ts, close_ts)
+            if active:
+                orders.extend(active)
+        self._open_orders[market] = orders
 
     def _quote_for_exit(self, side: str, bar_yes_bid: Optional[float], bar_yes_ask: Optional[float], bar_mid: Optional[float]) -> Optional[float]:
         if side == "YES":
@@ -469,7 +560,8 @@ class StinkBidStrategy:
             idx = int(r.get("level_idx", -1))
             by_level[idx] = by_level.get(idx, 0) + int(r.get("qty", 0))
         edge_vals = [float(r.get("entry_price", 0.0)) for r in fills]
-        adverse_1m = [float(r.get("entry_price", 0.0)) - float(r.get("exit_price", 0.0)) for r in exits if r.get("action") == "time_exit"]
+        adv_1m_vals = [float(r["adverse_selection_1m"]) for r in fills if r.get("adverse_selection_1m") is not None]
+        adv_5m_vals = [float(r["adverse_selection_5m"]) for r in fills if r.get("adverse_selection_5m") is not None]
         pnl_gross_sum = float(sum(float(r.get("pnl_gross", 0.0)) for r in exits))
         entry_fees = float(sum(float(r.get("fees", 0.0)) for r in fills))
         exit_fees = float(sum(float(r.get("fees", 0.0)) for r in exits))
@@ -478,6 +570,7 @@ class StinkBidStrategy:
             "total_fills": len(fills),
             "overall_fill_rate": (len(fills) / submitted) if submitted else 0.0,
             "fills_by_level": by_level,
+            "fills_by_level_json": json.dumps({int(k): int(v) for k, v in by_level.items()}, sort_keys=True),
             "avg_fill_latency_ms": (sum(self._fill_latency_ms) / len(self._fill_latency_ms)) if self._fill_latency_ms else 0.0,
             "median_fill_latency_ms": median(self._fill_latency_ms) if self._fill_latency_ms else 0.0,
             "avg_submit_latency_ms": (sum(self._submit_latency_ms) / len(self._submit_latency_ms)) if self._submit_latency_ms else 0.0,
@@ -487,8 +580,8 @@ class StinkBidStrategy:
             "fees_sum": entry_fees + exit_fees,
             "pnl_net_sum": pnl_gross_sum - entry_fees - exit_fees,
             "avg_edge_captured_at_fill": (sum(edge_vals) / len(edge_vals)) if edge_vals else 0.0,
-            "adverse_selection_1min": (sum(adverse_1m) / len(adverse_1m)) if adverse_1m else 0.0,
-            "adverse_selection_5min": (sum(adverse_1m) / len(adverse_1m)) if adverse_1m else 0.0,
+            "adverse_selection_1min": (sum(adv_1m_vals) / len(adv_1m_vals)) if adv_1m_vals else 0.0,
+            "adverse_selection_5min": (sum(adv_5m_vals) / len(adv_5m_vals)) if adv_5m_vals else 0.0,
             "max_inventory_contracts": self._max_inventory,
             "max_exposure_dollars": self._max_exposure,
             "final_bankroll": self.bankroll,

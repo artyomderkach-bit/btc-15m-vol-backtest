@@ -33,6 +33,26 @@ def test_cancel_timeout_marks_unfilled_orders():
     assert cancels[0]["note"] == "timeout_cancel"
 
 
+def test_replace_canceled_resubmits_same_level():
+    cfg = StinkBidConfig(
+        sides=("YES",),
+        num_levels=1,
+        bad_prices_yes=(0.01,),
+        cancel_timeout_ms=250,
+        max_contracts_per_level=1,
+        replace_canceled=True,
+    )
+    strat = StinkBidStrategy(bankroll=1000.0, config=cfg)
+    strat.submit_open_ladder("M1", open_ts=1000, close_ts=1900)
+    strat.process_trade_window("M1", open_ts=1000, close_ts=1900, trades=[], used_trade_data=True)
+    submits = [r for r in strat.trade_log if r.get("action") == "submit"]
+    replacements = [r for r in submits if r.get("note") == "replacement"]
+    cancels = [r for r in strat.trade_log if r.get("action") == "cancel"]
+    assert len(submits) >= 2
+    assert len(replacements) >= 1
+    assert len(cancels) >= 2
+
+
 def test_qty_cap_by_notional_per_market():
     cfg = StinkBidConfig(
         sides=("YES",),
